@@ -28,6 +28,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+
 from xllm.auto_config import utils
 
 Platform = utils.Platform
