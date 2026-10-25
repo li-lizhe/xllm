@@ -47,6 +47,19 @@ SMI_910B2_OUTPUT = """
 +===========================+===============+======================================================================+
 """
 
+# Same shape from an unsupported Ascend 310P3 host. Its Name column carries no
+# token this module maps, and the HBM column happens to read ``1950 / 65536`` --
+# a whole-output search finds the ``950`` inside ``1950`` and reports a5 for a
+# host that is not an A5 (or any generation the mapping knows).
+SMI_310P3_OUTPUT = """
+| NPU   Name                | Health        | Power(W)             Temp(C)                 Hugepages-Usage(page)   |
+| Chip                      | Bus-Id        | AICore(%)            Memory-Usage(MB)        HBM-Usage(MB)           |
++===========================+===============+======================================================================+
+| 0     310P3               | OK            | 78.5                 45                      0    / 0                |
+| 0                         | 0000:C1:00.0  | 0                    0    / 0                1950 / 65536            |
++===========================+===============+======================================================================+
+"""
+
 
 def _clear_platform_caches() -> None:
     """Drop the cached detections so a case re-reads the faked sources."""
@@ -80,6 +93,15 @@ def test_chip_comes_from_the_smi_name_column(monkeypatch: pytest.MonkeyPatch) ->
 
     assert Platform.get_npu_chip() == "910b2"
     assert Platform.get_ascend_soc_generation() == "a2"
+
+
+def test_smi_numbers_are_not_read_as_a_chip_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    # 310P3 is not a mapped generation, and the only ``950`` on the page sits in
+    # an unrelated numeric column, so nothing may be reported from it.
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: SimpleNamespace(stdout=SMI_310P3_OUTPUT))
+
+    assert Platform.get_npu_chip() == "unknown"
+    assert Platform.get_ascend_soc_generation() is None
 
 
 @pytest.mark.parametrize(
