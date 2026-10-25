@@ -73,6 +73,12 @@ class CpuArchEnum(enum.Enum):
 # the CUDA kernel package for all three through ``initialize_runtime()``.
 _CUDA_LIKE = (PlatformEnum.CUDA, PlatformEnum.DCU, PlatformEnum.ILU)
 
+# Ascend SoC chip tokens, aligned with the build-time mapping in
+# ``scripts/build_support/utils.py``: the ``910`` family covers A2/A3 and
+# ``950`` covers A5. An A3 host reports the SoC name ``Ascend910_93``, so ``_``
+# belongs to the token -- ``get_ascend_soc_generation()`` keys off ``910_93``.
+_ASCEND_CHIP_TOKEN = r"(?:910|950)[A-Za-z0-9_]*"
+
 
 def _torch_device_type() -> PlatformEnum | None:
     """Detect the accelerator via the framework runtime, or None if absent.
@@ -139,7 +145,7 @@ def _npu_chip_from_smi() -> str | None:
     except (OSError, subprocess.SubprocessError):
         return None
 
-    match = re.search(r"910[A-Za-z0-9]*", completed.stdout)
+    match = re.search(_ASCEND_CHIP_TOKEN, completed.stdout)
     if match is None:
         return None
     return match.group(0).lower()
@@ -150,7 +156,9 @@ def _npu_chip_from_acl() -> str | None:
 
     ``acl`` is often unavailable in the launcher's import path and may already
     be initialized by torch_npu, so failures are swallowed and this is only a
-    supplement to ``npu-smi``.
+    supplement to ``npu-smi``. ``acl.get_soc_name()`` returns the whole SoC name
+    (e.g. ``Ascend910B2``, ``Ascend910_93``), so the chip token keeps its
+    underscore.
     """
     try:
         import acl
@@ -162,7 +170,7 @@ def _npu_chip_from_acl() -> str | None:
         return None
     if not soc_name:
         return None
-    match = re.search(r"910[A-Za-z0-9]*", soc_name)
+    match = re.search(_ASCEND_CHIP_TOKEN, soc_name)
     if match is None:
         return None
     return match.group(0).lower()
